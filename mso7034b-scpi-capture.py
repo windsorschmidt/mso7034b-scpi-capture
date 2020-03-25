@@ -49,7 +49,7 @@ scope.write(':timebase:range 1e-2')
 scope.write(':timebase:delay 0')
 scope.write(':timebase:reference left')
 scope.write(':channel1:probe 10')
-scope.write(':channel1:range 1.6e0')
+scope.write(':channel1:range 1.6e1')
 scope.write(':channel1:offset 0')
 scope.write(':channel1:coupling dc')
 scope.write(':trigger:mode edge')
@@ -69,7 +69,8 @@ scope.write(':digitize channel1')
 # so generate a pulse, otherwise we will catch a timeout exception
 print('generating pulse')
 ssh_cmd = 'ssh cpsb4_wan'
-exe = '/home/pi/projects/cps/interface/close_one'
+# exe = '/home/pi/projects/cps/interface/close_one'
+exe = '/home/pi/projects/cps/interface/open_one'
 device = '/dev/ttyAMA0'
 row = '191'
 col = '228'
