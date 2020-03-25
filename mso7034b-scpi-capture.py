@@ -13,7 +13,10 @@
 #   https://www.keysight.com/upload/cmc_upload/All/7000B_series_prog_guide.pdf
 
 import os
+import subprocess as proc
 import numpy as np
+# import matplotlib
+# matplotlib.rcParams['font.sans-serif'] = ['Go', 'sans-serif']
 import matplotlib.pyplot as plt
 import pyvisa
 
@@ -25,41 +28,60 @@ import pyvisa
 IP = os.getenv('MSO7034B_HOST')
 PORT = os.getenv('MSO7034B_PORT')
 
-# Set up resource handle to scope
+print('connecting to scope')
 rm = pyvisa.ResourceManager()
 scope = rm.open_resource('TCPIP::{}::{}::SOCKET'.format(IP, PORT))
 scope.read_termination = '\n'
 scope.write_termination = '\n'
-scope.timeout = 10000
+scope.timeout = 30000
 
+print('querying scope identification')
 r = scope.query('*idn?')
 if r.split(',')[1] != 'MSO7034B':
     exit('It\'s dark here. You\'re likely to be eaten by a grue.')
-    
-# Set scope parameters
+print(r)
+
+print('setting scope parameters')
 scope.clear()
 scope.write('*rst')
 scope.write(':timebase:mode main')
 scope.write(':timebase:range 1e-2')
 scope.write(':timebase:delay 0')
-scope.write(':timebase:reference center')
+scope.write(':timebase:reference left')
 scope.write(':channel1:probe 10')
-scope.write(':channel1:range 8')
+scope.write(':channel1:range 1.6e0')
 scope.write(':channel1:offset 0')
 scope.write(':channel1:coupling dc')
-scope.write(':trigger:sweep normal')
-scope.write(':trigger:edge:source chan1')
-scope.write(':trigger:level .1')
+scope.write(':trigger:mode edge')
+scope.write(':trigger:holdoff 1e0')
+scope.write(':trigger:level 0.1')
+scope.write(':trigger:hfreject on')
+scope.write(':trigger:reject hf')
 scope.write(':trigger:slope positive')
+scope.write(':trigger:source chan1')
+scope.write(':trigger:sweep normal')
 scope.write(':acquire:type normal')
 scope.write(':acquire:complete 100')
 scope.write(':acquire:count 1')
 scope.write(':digitize channel1')
+
+# digitize will block further interaction with instrument,
+# so generate a pulse, otherwise we will catch a timeout exception
+print('generating pulse')
+ssh_cmd = 'ssh cpsb4_wan'
+exe = '/home/pi/projects/cps/interface/close_one'
+device = '/dev/ttyAMA0'
+row = '191'
+col = '228'
+cmd = '{} -d {} -row {} -col {}'.format(exe, device, row, col)
+r = proc.run(ssh_cmd.split() + cmd.split())
+
+print('gathering waveform data')
+scope.write(':waveform:source channel1')
 scope.write(':waveform:points 1000')
 scope.write(':waveform:format word')
 scope.write(':waveform:unsigned on')
 scope.write(':waveform:byteorder lsbfirst')
-scope.write(':waveform:source channel1')
 
 # Get X/Y axis ranges
 xrng = float(scope.query(':timebase:range?'))
@@ -77,15 +99,15 @@ acq_data = np.array(r)
 volts = (acq_data - yref) * yinc + yorg
 time = np.arange(0, xinc * len(volts), xinc)
 
-# Plot acquisition data
+print('plotting waveform data')
 plt.ylabel('volts')
 plt.xlabel('time')
 plt.margins(x=0)
-plt.grid(color='#bbbbbb', linestyle='-', linewidth=1)
+plt.grid(color='#dddddd', linestyle='-', linewidth=1)
 plt.xticks(np.arange(0, xrng, step=xrng/10))
 plt.ylim(-yrng/2, yrng/2)
-plt.plot(time, volts) 
-plt.show()
+plt.plot(time, volts, color='#ff0088') 
+plt.savefig('capture.png', facecolor='w', edgecolor='w', dpi=120)
 
 # A waveform record consists of either all of the acquired points or a
 # subset of the acquired points. The number of points acquired may be
@@ -114,12 +136,3 @@ plt.show()
 #
 # • 0xFF or 0xFFFF — Clipped high. These are locations where the 
 #   waveform is clipped at the top of the oscilloscope display.
-
-# Read the trigger event flag (cleared by scope on read)
-# print(scope.query(':ter?'))
-
-# Save an image of the scope's display to disk
-# img = scope.query_binary_values(':display:data? png, scr, col', datatype='c')
-# with open('scope_screenshot.png', 'wb') as f:
-#     for b in img:
-#         f.write(b)
