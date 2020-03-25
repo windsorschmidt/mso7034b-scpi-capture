@@ -136,3 +136,9 @@ plt.savefig('capture.png', facecolor='w', edgecolor='w', dpi=120)
 #
 # • 0xFF or 0xFFFF — Clipped high. These are locations where the 
 #   waveform is clipped at the top of the oscilloscope display.
+
+# Save a screenshot
+# img = scope.query_binary_values(':display:data? png, scr, col', datatype='c')
+# with open('screenshot.png', 'wb') as f:
+#     for b in img:
+#         f.write(b)
